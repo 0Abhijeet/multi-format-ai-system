@@ -1,0 +1,59 @@
+[
+  {
+    "classification": {
+      "format": "Email",
+      "intent": "Complaint"
+    },
+    "result": {
+      "sender": "customer@example.com",
+      "tone": "angry",
+      "urgency": "high",
+      "action": "escalate",
+      "intent": "Complaint"
+    },
+    "action": "escalated"
+  },
+  {
+    "classification": {
+      "format": "PDF",
+      "intent": "Invoice"
+    },
+    "result": {
+      "invoice_total": 0,
+      "flag_total_exceeds": false,
+      "compliance_terms": [
+        "GDPR"
+      ],
+      "intent": "Invoice"
+    },
+    "action": "no_action"
+  },
+  {
+    "classification": {
+      "format": "JSON",
+      "intent": "Unknown"
+    },
+    "result": {
+      "anomaly": false,
+      "missing_fields": null,
+      "data": {
+        "classification": {
+          "format": "JSON",
+          "intent": "Webhook"
+        },
+        "result": {
+          "anomaly": false,
+          "missing_fields": null,
+          "data": {
+            "id": "abc123",
+            "event": "signup",
+            "timestamp": "2025-06-01T12:00:00Z"
+          }
+        },
+        "action": "no_action"
+      },
+      "intent": "Unknown"
+    },
+    "action": "no_action"
+  }
+]
