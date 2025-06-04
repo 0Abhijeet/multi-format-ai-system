@@ -97,28 +97,32 @@ Returns full processing logs stored in memory.
 
 ## 🖼️ Screenshots
 
-### 1. 📤 File Upload Interface (`/ui`)
+#### 1. UI Upload Page (`/ui`)
+This is the simple upload interface available at `/ui`
 
 ![Upload UI](screenshots/upload_ui.png)
 > Shows the web interface where users can upload Email, PDF, or JSON files.
 
 ---
 
-### 2. 📬 Processed API Response (`POST /process`)
+#### 2. Sample API Response
+This shows a JSON response returned by the `/process` endpoint.
 
 ![Sample Response](screenshots/sample_response.png)
 > Displays a full classification + intent + result JSON output from the API.
 
 ---
 
-### 3. 📚 Logs Memory Store (`GET /logs`)
+#### 3. Docker Logs
+Output of running the system inside Docker, showing logs and processing.
 
 ![Logs Output](screenshots/logs_output.png)
 > Shows the internal memory log trace that stores classification + actions for audit/debugging.
 
 ---
 
-### 4. 🐳 Docker Container Running
+#### 4. Logs Endpoint Output
+Result of hitting `/logs` to view audit trail in memory.
 
 ![Docker Running](screenshots/docker_running.png)
 > Terminal screenshot showing the Docker container building and running the FastAPI app.
