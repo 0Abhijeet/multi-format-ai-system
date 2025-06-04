@@ -127,6 +127,10 @@ Result of hitting `/logs` to view audit trail in memory.
 ![Docker Running](screenshots/docker_running.png)
 > Terminal screenshot showing the Docker container building and running the FastAPI app.
 
+## 🎥 Demo Video
+
+🎥 [Watch the Demo Video](https://www.youtube.com/watch?v=AopYRWwwjEY)
+
 ---
 
 ## 👨‍💼 Developed As Internship Project
