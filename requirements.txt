@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pypdf2
+python-multipart
+streamlit
+requests
+redis             
+langchain        
+openai            
+faker           
+langchain
+openai
+tiktoken
+jinja2
+python-multipart

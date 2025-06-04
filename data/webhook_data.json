@@ -1,0 +1,16 @@
+{
+  "classification": {
+    "format": "JSON",
+    "intent": "Webhook"
+  },
+  "result": {
+    "anomaly": false,
+    "missing_fields": null,
+    "data": {
+      "id": "abc123",
+      "event": "signup",
+      "timestamp": "2025-06-01T12:00:00Z"
+    }
+  },
+  "action": "no_action"
+}
