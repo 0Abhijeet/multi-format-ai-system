@@ -13,3 +13,10 @@ openai
 tiktoken
 jinja2
 python-multipart
+langgraph
+langgraph-checkpoint-postgres
+groq
+python-dotenv
+pytest
+pytest-asyncio
+httpx

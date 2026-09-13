@@ -8,27 +8,31 @@ def post_risk_alert(data):
     print("[Simulated] POST /risk_alert", data)
     return "risk_alert_sent"
 
-def route_action(agent_output):
+async def route_action(agent_output):
+    """
+    NOTE: this function is now UNUSED / dead code -- tool_calling_agent.py
+    replaces it entirely with real LLM-decided tool calls. Kept only
+    because post_to_crm/post_risk_alert below are still reused as the
+    actual tool implementations. Left in place rather than deleted so the
+    original logic (including its dead "policy" branch) stays visible for
+    reference/build-log purposes; delete if you'd rather not carry it.
+    """
     intent = agent_output.get("intent", "").lower()
     action = agent_output.get("action")
 
-    # Define wrapped actions for retry
-    def escalate():
-        return post_to_crm(agent_output)
+    async def escalate():
+        return await retry_action(lambda: post_to_crm(agent_output))
 
-    def alert():
-        return post_risk_alert(agent_output)
+    async def alert():
+        return await retry_action(lambda: post_risk_alert(agent_output))
 
-    # Email complaints: escalate if tone and urgency are high
     if action == "escalate":
-        return retry_action(escalate)
+        return await escalate()
 
-    # Invoice or PDF: flag if amount > 10,000
     if intent == "invoice" and agent_output.get("data", {}).get("amount", 0) > 10000:
-        return retry_action(alert)
+        return await alert()
 
-    # PDF policy: flag if "GDPR", "FDA", etc. terms found
     if intent in {"regulation", "policy"} and agent_output.get("compliance_terms"):
-        return retry_action(alert)
+        return await alert()
 
     return "no_action"
