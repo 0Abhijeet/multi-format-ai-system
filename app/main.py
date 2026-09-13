@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
+
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -12,8 +13,10 @@ from pydantic import BaseModel
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
+from langfuse.langchain import CallbackHandler
 
 from app.graphs.pipeline import build_graph, DEFAULT_RECURSION_LIMIT
+from app.graphs.tracing import get_langfuse_client
 from app.memory.store import memory_store
 
 templates = Jinja2Templates(directory="templates")
@@ -38,9 +41,34 @@ class ReviewDecision(BaseModel):
     feedback: str | None = None
 
 
-def _format_result(state: dict) -> dict:
+def _build_callbacks(thread_id: str) -> list:
+    """
+    Langfuse's LangChain/LangGraph CallbackHandler automatically traces
+    every node in the graph (including the conditional-edge routing
+    functions) with zero manual per-node instrumentation -- a deliberate
+    choice over the RAG project's manual span-per-call approach, since
+    LangGraph is part of the LangChain ecosystem and has first-class
+    support for this.
+
+    THE REAL THING VERIFIED, NOT ASSUMED: a fresh CallbackHandler on each
+    separate ainvoke() call (e.g. /process, then /review/{thread_id}
+    resuming it) produces TWO DISCONNECTED traces by default -- confirmed
+    experimentally with an injected in-memory exporter before writing this
+    code. Seeding trace_context={"trace_id": ...} with the SAME
+    deterministic ID (derived from thread_id via Langfuse's own documented
+    create_trace_id(seed=...) helper) on every call for a given thread_id
+    unifies them into ONE real trace spanning the human-approval pause --
+    also confirmed experimentally, not assumed.
+    """
+    langfuse = get_langfuse_client()
+    trace_id = langfuse.create_trace_id(seed=thread_id)
+    return [CallbackHandler(trace_context={"trace_id": trace_id})]
+
+
+def _format_result(state: dict, thread_id: str) -> dict:
     return {
         "status": "completed",
+        "thread_id": thread_id,
         "classification": state["classification"],
         "result": state["agent_result"],
         "action": state["action_result"],
@@ -69,7 +97,10 @@ def root():
 async def process(file: UploadFile = File(...)):
     content = await file.read()
     thread_id = str(uuid.uuid4())
-    config = {"configurable": {"thread_id": thread_id, "recursion_limit": DEFAULT_RECURSION_LIMIT}}
+    config = {
+        "configurable": {"thread_id": thread_id, "recursion_limit": DEFAULT_RECURSION_LIMIT},
+        "callbacks": _build_callbacks(thread_id),
+    }
 
     try:
         state = await app.state.graph.ainvoke(
@@ -81,18 +112,24 @@ async def process(file: UploadFile = File(...)):
     if "__interrupt__" in state:
         return _format_pending(thread_id, state)
 
-    response = _format_result(state)
+    response = _format_result(state, thread_id)
     _log_completed(response)
     return response
 
 
 @app.post("/review/{thread_id}")
 async def submit_review(thread_id: str, decision: ReviewDecision):
-    config = {"configurable": {"thread_id": thread_id, "recursion_limit": DEFAULT_RECURSION_LIMIT}}
+    config = {
+        "configurable": {"thread_id": thread_id, "recursion_limit": DEFAULT_RECURSION_LIMIT},
+        "callbacks": _build_callbacks(thread_id),
+    }
 
-    checkpoint_tuple = await app.state.checkpointer.aget_tuple(config)
-    if checkpoint_tuple is None:
-        raise HTTPException(status_code=404, detail=f"No such review thread: {thread_id}")
+    snapshot = await app.state.graph.aget_state(config)
+    if not snapshot.interrupts:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Thread {thread_id} has no pending review to submit (it doesn't exist, or already completed)",
+        )
 
     resume_payload = decision.model_dump(exclude_none=True)
     try:
@@ -103,7 +140,7 @@ async def submit_review(thread_id: str, decision: ReviewDecision):
     if "__interrupt__" in state:
         return _format_pending(thread_id, state)
 
-    response = _format_result(state)
+    response = _format_result(state, thread_id)
     _log_completed(response)
     return response
 
