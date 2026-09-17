@@ -68,8 +68,8 @@ table is a fast-scan index for interview revision, not new content.
 | 10 | §5 Tests/CI | `test_router.py`'s risk-alert test asserted an outcome its own input could never produce | Fixing bug #9 surfaced it | Corrected input to a real trigger case; added missing regulation-branch coverage |
 | 11 | §5 Tests/CI | `json_agent.py` can't flag a partial Webhook payload as anomalous — intent-detection requires `event`+`id` both present just to classify it as Webhook at all | Running the pre-existing `test_agents.py` suite for the first time in this work | **Not fixed** — documented as a known gap; feeds directly into the critic, so changing it risks invalidating already-verified work |
 | 12 | §6 Langfuse | A fresh `CallbackHandler` per `ainvoke()` call produces disconnected trace IDs by default | Experimentally, with an injected in-memory exporter, before writing production code | Seeded `create_trace_id(seed=thread_id)` identically on every call for a given thread — confirmed one unified trace, in sandbox and live |
-| 13 | §7 DivyaSree adaptation | Windows' default `ProactorEventLoop` doesn't support the socket operations `psycopg` needs for async Postgres connections — every checkpointer-dependent test failed identically | First full local `pytest` run after adding the new test files | Set `asyncio.WindowsSelectorEventLoopPolicy()` at the top of `conftest.py`, before any other import |
-| 14 | §7 DivyaSree adaptation | `test_post_review_unknown_thread_404s` asserted `404`, but an earlier fix in this same project (bug #7) had already correctly changed that response to `400` — the test simply hadn't been updated to match | Full suite re-run after adding the cost-threshold gate | Updated assertion and test name to `400` |
+| 13 | §7 Domain adaptation | Windows' default `ProactorEventLoop` doesn't support the socket operations `psycopg` needs for async Postgres connections — every checkpointer-dependent test failed identically | First full local `pytest` run after adding the new test files | Set `asyncio.WindowsSelectorEventLoopPolicy()` at the top of `conftest.py`, before any other import |
+| 14 | §7 Domain adaptation | `test_post_review_unknown_thread_404s` asserted `404`, but an earlier fix in this same project (bug #7) had already correctly changed that response to `400` — the test simply hadn't been updated to match | Full suite re-run after adding the cost-threshold gate | Updated assertion and test name to `400` |
 
 ---
 
@@ -348,21 +348,21 @@ both `/process` and `/review/{thread_id}`'s callback construction.
 
 ---
 
-## Section 7 — Adapted for DivyaSree's Build Track (facilities/co-living triage)
+## Section 7 — Adapted for a facilities/co-living maintenance-triage use case
 
 ### Context
 This system was originally built as a general-purpose multi-format document
-classifier/router (Sections 1–6 above). For DivyaSree's Forward Deployed
-Engineer Build Track, it was adapted to a facilities/co-living maintenance-
-triage domain: reframed input channels (email → resident complaint,
-JSON → system-generated ticket, PDF → vendor invoice/inspection report),
-and one new, real piece of logic — a cost-threshold approval gate.
+classifier/router (Sections 1–6 above). It was later adapted to a
+facilities/co-living maintenance-triage domain: reframed input channels
+(email → resident complaint, JSON → system-generated ticket,
+PDF → vendor invoice/inspection report), and one new, real piece of
+logic — a cost-threshold approval gate.
 
-Stating this directly rather than implying a from-scratch build: given the
-Build Track's timeline, reusing a system already built and verified let the
-available time go into what was genuinely new to this problem — the domain
-reframing and the cost-based approval logic — rather than rebuilding
-orchestration infrastructure already solved elsewhere.
+Stating this directly rather than implying a from-scratch build: reusing
+a system already built and verified let the available time go into what
+was genuinely new to this domain — the reframing and the cost-based
+approval logic — rather than rebuilding orchestration infrastructure
+already solved elsewhere.
 
 ### Cost-threshold gate (new)
 Any ticket with an extracted cost (`invoice_total`) exceeding $10,000 now

@@ -1,6 +1,6 @@
 # Facilities Maintenance Triage Agent
 
-*This project began as a general-purpose document classifier and router; the sections below describe how it was adapted specifically for DivyaSree's facilities/co-living context — see the written note for what's original architecture versus what was built new for this problem.*
+*This project began as a general-purpose document classifier and router; the sections below describe how it was adapted for a facilities/co-living maintenance-operations domain.*
 
 A document-intake pipeline built as a real LangGraph state machine: a maintenance ticket comes in — a resident complaint via email, a structured event from a facilities ticketing system, or a vendor's inspection/invoice report — and the system classifies it, extracts structured data, and decides what to do: escalate to the facilities manager, dispatch a vendor, or flag for cost approval, using an LLM-driven critic and tool-calling agent, not hardcoded rules.
 
@@ -12,7 +12,7 @@ A document-intake pipeline built as a real LangGraph state machine: a maintenanc
 - **Cost-threshold human approval**: any ticket with an estimated repair/vendor cost above $10,000 requires facilities-manager sign-off before dispatch, regardless of how confident the AI is — a real business rule, not a generic confidence gate
 - Postgres-backed checkpointing, verified to survive an actual process restart — a paused approval genuinely isn't lost
 - Human-in-the-loop with a real reject-and-reconsider loop, not a rubber stamp
-- Full pytest suite (18 tests) and CI, covering every conditional branch including the new cost-gate logic
+- Full pytest suite (18 tests) and CI, covering every conditional branch including the cost-gate logic
 
 ## Tech stack
 
@@ -30,7 +30,7 @@ A document-intake pipeline built as a real LangGraph state machine: a maintenanc
 
 | Decision | Reasoning |
 |---|---|
-| Reused an existing classifier/router rather than building from scratch | The orchestration layer (graph, checkpointing, tool-calling, HITL) was already solved and verified; adapting it let the available time go into what was actually new to this problem — the domain reframing and the cost-threshold logic |
+| Reused an existing classifier/router rather than building from scratch | The orchestration layer (graph, checkpointing, tool-calling, HITL) was already solved and verified; adapting it let the available time go into what was actually new — the domain reframing and the cost-threshold logic |
 | Cost-threshold gate as an *addition* to the confidence gate, not a replacement | Only ticket types with an extractable cost figure (vendor invoices) have anything to threshold — resident complaints have no cost field, so they correctly keep the original confidence-only gate. A universal cost check would have been dishonest about what the data actually supports |
 | Critic's confidence drives a real conditional branch | An earlier design where the critic always proceeded to the same next step was assessed as a two-step pipeline wearing a multi-agent costume — redesigned before building further |
 | Human reviewer gets a genuine reject path, not approve-only | Makes the interrupt an actual gate, not a rubber stamp |
