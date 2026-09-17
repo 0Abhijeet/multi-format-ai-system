@@ -1,3 +1,9 @@
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import os
 from types import SimpleNamespace
 
@@ -19,16 +25,6 @@ def fake_tool_call(name):
 
 
 class ScriptedGroqClient:
-    """
-    Lets a test force an exact sequence of critic/tool-calling LLM
-    responses, shaped identically to Groq's real ChatCompletionMessage
-    (content for JSON mode, tool_calls[i].function.name/.arguments for
-    function-calling -- verified against groq's actual type definitions,
-    not guessed). Used throughout this suite instead of real Groq calls:
-    CI shouldn't burn real API quota on every push, and scripting is the
-    only way to deterministically force specific branches (low confidence,
-    which tool gets called) on demand.
-    """
     def __init__(self, script):
         self.script = list(script)
         self.calls = []
@@ -49,11 +45,6 @@ class ScriptedGroqClient:
 
 @pytest.fixture
 def patch_groq():
-    """Tests call this with a list of fake_message(...)/fake_tool_call(...)
-    responses; patches both critic_agent and tool_calling_agent's
-    get_groq_client to the scripted fake and returns the client so tests
-    can inspect .calls (e.g. to assert the critic was genuinely called
-    twice in a reject-loop, not just once)."""
     def _patch(script):
         client = ScriptedGroqClient(script)
         critic_module.get_groq_client = lambda: client
@@ -64,9 +55,6 @@ def patch_groq():
 
 @pytest_asyncio.fixture
 async def checkpointer():
-    """Fresh AsyncPostgresSaver per test, against DATABASE_URL. setup() is
-    idempotent (CREATE TABLE IF NOT EXISTS style) -- safe to call every
-    test, not just once."""
     db_uri = os.environ["DATABASE_URL"]
     async with AsyncPostgresSaver.from_conn_string(db_uri) as cp:
         await cp.setup()

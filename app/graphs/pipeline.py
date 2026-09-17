@@ -25,7 +25,7 @@ from app.agents.pdf_agent import process_pdf
 from app.graphs.critic_agent import critic_node
 from app.graphs.tool_calling_agent import tool_calling_node
 from app.graphs.human_review import human_review_node
-
+from app.graphs.human_review import human_review_node, COST_THRESHOLD
 DEFAULT_RECURSION_LIMIT = 10
 
 
@@ -80,8 +80,20 @@ async def unsupported_node(state: GraphState) -> dict:
 
 
 def _route_by_confidence(state: GraphState) -> str:
-    return "tool_calling" if state.get("confidence") == "high" else "human_review"
+    """
+    Cost-threshold gate added on top of the existing confidence gate:
+    ANY ticket whose extracted cost exceeds COST_THRESHOLD routes to
+    human_review regardless of critic confidence -- a facilities manager
+    must approve high-cost vendor dispatch even when the AI is "sure."
+    Below-threshold tickets still follow the original confidence-only gate.
+    """
+    agent_result = state.get("agent_result") or {}
+    estimated_cost = agent_result.get("invoice_total", 0) or 0
 
+    if estimated_cost > COST_THRESHOLD:
+        return "human_review"
+
+    return "tool_calling" if state.get("confidence") == "high" else "human_review"
 
 def _route_after_human_review(state: GraphState) -> str:
     return "tool_calling" if state.get("confidence") == "human-approved" else "critic"

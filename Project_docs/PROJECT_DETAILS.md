@@ -68,6 +68,8 @@ table is a fast-scan index for interview revision, not new content.
 | 10 | §5 Tests/CI | `test_router.py`'s risk-alert test asserted an outcome its own input could never produce | Fixing bug #9 surfaced it | Corrected input to a real trigger case; added missing regulation-branch coverage |
 | 11 | §5 Tests/CI | `json_agent.py` can't flag a partial Webhook payload as anomalous — intent-detection requires `event`+`id` both present just to classify it as Webhook at all | Running the pre-existing `test_agents.py` suite for the first time in this work | **Not fixed** — documented as a known gap; feeds directly into the critic, so changing it risks invalidating already-verified work |
 | 12 | §6 Langfuse | A fresh `CallbackHandler` per `ainvoke()` call produces disconnected trace IDs by default | Experimentally, with an injected in-memory exporter, before writing production code | Seeded `create_trace_id(seed=thread_id)` identically on every call for a given thread — confirmed one unified trace, in sandbox and live |
+| 13 | §7 DivyaSree adaptation | Windows' default `ProactorEventLoop` doesn't support the socket operations `psycopg` needs for async Postgres connections — every checkpointer-dependent test failed identically | First full local `pytest` run after adding the new test files | Set `asyncio.WindowsSelectorEventLoopPolicy()` at the top of `conftest.py`, before any other import |
+| 14 | §7 DivyaSree adaptation | `test_post_review_unknown_thread_404s` asserted `404`, but an earlier fix in this same project (bug #7) had already correctly changed that response to `400` — the test simply hadn't been updated to match | Full suite re-run after adding the cost-threshold gate | Updated assertion and test name to `400` |
 
 ---
 
@@ -291,7 +293,7 @@ straight-through, low-confidence → approve, reject → loops back to critic
 for real — critic call count asserted, not just outcome — recursion-limit
 finding as a regression-protecting assertion, restart survival via a
 genuinely fresh connection), and full HTTP-level API tests (real lifespan,
-real `ASGITransport`, correct 404s on unknown/never-paused threads).
+real `ASGITransport`, correct 400s on unknown/never-paused threads).
 
 ---
 
@@ -346,6 +348,58 @@ both `/process` and `/review/{thread_id}`'s callback construction.
 
 ---
 
+## Section 7 — Adapted for DivyaSree's Build Track (facilities/co-living triage)
+
+### Context
+This system was originally built as a general-purpose multi-format document
+classifier/router (Sections 1–6 above). For DivyaSree's Forward Deployed
+Engineer Build Track, it was adapted to a facilities/co-living maintenance-
+triage domain: reframed input channels (email → resident complaint,
+JSON → system-generated ticket, PDF → vendor invoice/inspection report),
+and one new, real piece of logic — a cost-threshold approval gate.
+
+Stating this directly rather than implying a from-scratch build: given the
+Build Track's timeline, reusing a system already built and verified let the
+available time go into what was genuinely new to this problem — the domain
+reframing and the cost-based approval logic — rather than rebuilding
+orchestration infrastructure already solved elsewhere.
+
+### Cost-threshold gate (new)
+Any ticket with an extracted cost (`invoice_total`) exceeding $10,000 now
+routes to `human_review` regardless of the critic's confidence — a
+facilities manager must approve high-cost vendor dispatch even when the
+AI is certain. This only applies to cost-bearing ticket types (vendor
+invoices); resident complaints have no cost field and correctly keep the
+original confidence-only gate — an honest scope boundary, not an oversight.
+
+Implemented in `_route_by_confidence` (`pipeline.py`) and
+`_build_interrupt_payload` (`human_review.py`), which now tags each
+interrupt with *why* it fired (`cost_threshold_exceeded` vs.
+`intent_conflict`) so a human reviewer knows which decision they're
+actually making.
+
+### Known simplification, stated plainly
+Rejecting a cost-threshold approval loops back through the same
+intent-reconsideration path as rejecting an intent disagreement — the
+existing reject-loop mechanism, reused rather than building a second
+pathway distinguishing "reconsider the classification" from "don't
+approve this cost." Correct call for this project's timeline; a
+production version handling both cases correctly would need to split them.
+
+### Bugs found during this adaptation
+See Bug Log entries #13 and #14 above (Windows event-loop policy for
+async Postgres tests; a stale `404` test assertion that hadn't been
+updated after an earlier fix in this same project changed that response
+to `400`).
+
+### Verification
+Full 18-test pytest suite re-run and passing after the change, including
+the boundary case (`$10,000` exactly still auto-proceeds, `$10,000.01`
+routes to human review) and confirmation that cost-free ticket types
+(email complaints) are unaffected by the new gate.
+
+---
+
 ## Known limitations (said out loud on purpose)
 
 - **`json_agent.py`'s Webhook-detection gap** (Section 5) is real and
@@ -353,13 +407,14 @@ both `/process` and `/review/{thread_id}`'s callback construction.
   validation. Deliberately left alone: fixing it changes what `critic_node`
   sees for every JSON document with partial `event`/`id` fields, which
   would require re-verifying work already confirmed correct.
-- **Live low-confidence HITL trigger not yet observed in production** at
-  time of writing. The mechanism itself is proven correct — real
-  interrupt, real resume, real reject-loop, real restart-survival, all
-  verified against real Postgres/LangGraph — but every live document
-  tried so far has resolved confidently on the real model's first pass.
-  Worth stating plainly rather than implying a live low-confidence run has
-  been observed when it hasn't.
+- **Cost-threshold rejection uses the same reconsideration loop as intent
+  rejection** (Section 7) — a real simplification for this project's
+  scope, not a production-ready distinction.
+- **Live low-confidence HITL trigger not yet observed on every input
+  tried.** The mechanism itself is proven correct — real interrupt, real
+  resume, real reject-loop, real restart-survival, all verified against
+  real Postgres/LangGraph — but confidence resolution depends on the real
+  model's judgment per document.
 - **No cost/token tracking in Langfuse** for this app specifically — see
   Section 6.
 - **`route_action()` is dead code**, kept intentionally as documented
@@ -372,8 +427,8 @@ Stateful agent orchestration (LangGraph), Postgres-backed checkpointing
 with verified cross-restart persistence, real tool-calling/function-calling
 agents (not hardcoded branching), human-in-the-loop workflows with a
 genuine reject-and-reconsider loop, multi-agent coordination via a critic
-whose judgment drives real conditional routing, LangGraph/LangChain-native
-observability (Langfuse), and a fully tested (pytest) CI pipeline covering
-every conditional branch — including forced tool-calls, forced interrupts,
-and the recursion-limit boundary — built from scratch for a repo that had
-none before.
+whose judgment drives real conditional routing, domain-specific adaptation
+of existing orchestration infrastructure (cost-threshold business logic),
+LangGraph/LangChain-native observability (Langfuse), and a fully tested
+(pytest) CI pipeline covering every conditional branch — including forced
+tool-calls, forced interrupts, and the recursion-limit boundary.
